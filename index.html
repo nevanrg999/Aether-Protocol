@@ -1,0 +1,222 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AetherTrust Network</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              neon: {
+                blue: '#00f3ff',
+                purple: '#bc13fe',
+                green: '#0aff00',
+                pink: '#ff0099',
+                yellow: '#facc15',
+                red: '#ff2a2a',
+                dark: '#02040a', 
+                panel: 'rgba(11, 15, 25, 0.7)',
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+              display: ['Rajdhani', 'sans-serif'], // Imaginary font fallback, styled as sans
+            },
+            backgroundImage: {
+              'cyber-grid': "linear-gradient(transparent 0%, #00f3ff 2%, transparent 3%), linear-gradient(90deg, transparent 0%, #00f3ff 2%, transparent 3%)",
+              'holographic': "linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 50%, rgba(255,255,255,0.03) 100%)",
+            },
+            animation: {
+              'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'glow': 'glow 3s ease-in-out infinite alternate',
+              'scanline': 'scanline 8s linear infinite',
+              'spin-slow': 'spin 12s linear infinite',
+              'spin-reverse': 'spin-reverse 15s linear infinite',
+              'float': 'float 6s ease-in-out infinite',
+              'grid-move': 'gridMove 20s linear infinite',
+              'glitch': 'glitch 1s linear infinite',
+              'border-beam': 'borderBeam 2s linear infinite',
+            },
+            keyframes: {
+              glow: {
+                '0%': { boxShadow: '0 0 5px rgba(0, 243, 255, 0.2)' },
+                '100%': { boxShadow: '0 0 20px rgba(0, 243, 255, 0.6), 0 0 10px rgba(188, 19, 254, 0.4)' }
+              },
+              scanline: {
+                '0%': { backgroundPosition: '0 -100vh' },
+                '100%': { backgroundPosition: '0 100vh' }
+              },
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-10px)' }
+              },
+              gridMove: {
+                '0%': { transform: 'perspective(500px) rotateX(60deg) translateY(0)' },
+                '100%': { transform: 'perspective(500px) rotateX(60deg) translateY(50px)' }
+              },
+              'spin-reverse': {
+                'from': { transform: 'rotate(360deg)' },
+                'to': { transform: 'rotate(0deg)' }
+              },
+              borderBeam: {
+                '0%, 100%': { borderColor: 'rgba(0, 243, 255, 0.2)' },
+                '50%': { borderColor: 'rgba(0, 243, 255, 1)' }
+              }
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Rajdhani:wght@500;600;700&display=swap');
+
+      body {
+        background-color: #02040a;
+        color: #e2e8f0;
+        font-family: 'Inter', sans-serif;
+        overflow: hidden;
+      }
+      
+      h1, h2, h3, h4, h5, h6 {
+        font-family: 'Rajdhani', sans-serif;
+        text-transform: uppercase;
+      }
+
+      /* Base HUD Panel */
+      .hud-panel {
+        background: rgba(8, 12, 20, 0.65);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+        position: relative;
+      }
+      
+      /* Angled Corners ("Cyber Cut") */
+      .cyber-cut {
+        clip-path: polygon(
+          15px 0, 100% 0, 
+          100% calc(100% - 15px), calc(100% - 15px) 100%, 
+          0 100%, 0 15px
+        );
+      }
+      .cyber-cut-br {
+        clip-path: polygon(
+          0 0, 100% 0, 
+          100% calc(100% - 20px), calc(100% - 20px) 100%, 
+          0 100%
+        );
+      }
+
+      /* Tech Borders */
+      .tech-border {
+        position: relative;
+      }
+      .tech-border::before, .tech-border::after {
+        content: '';
+        position: absolute;
+        width: 10px; height: 10px;
+        transition: all 0.3s ease;
+        pointer-events: none;
+      }
+      .tech-border::before {
+        top: -1px; left: -1px;
+        border-top: 2px solid rgba(0, 243, 255, 0.3);
+        border-left: 2px solid rgba(0, 243, 255, 0.3);
+      }
+      .tech-border::after {
+        bottom: -1px; right: -1px;
+        border-bottom: 2px solid rgba(0, 243, 255, 0.3);
+        border-right: 2px solid rgba(0, 243, 255, 0.3);
+      }
+      .tech-border:hover::before, .tech-border:hover::after {
+        width: 100%; height: 100%;
+        border-color: rgba(0, 243, 255, 0.8);
+      }
+
+      /* Scrollbar */
+      ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #02040a;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #1e293b;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #00f3ff;
+      }
+
+      /* Glitch Text Effect Utility */
+      .glitch-text {
+        position: relative;
+      }
+      .glitch-text::before, .glitch-text::after {
+        content: attr(data-text);
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: #02040a;
+      }
+      .glitch-text::before {
+        left: 2px;
+        text-shadow: -1px 0 #ff00c1;
+        clip: rect(24px, 550px, 90px, 0);
+        animation: glitch-anim-2 3s infinite linear alternate-reverse;
+      }
+      .glitch-text::after {
+        left: -2px;
+        text-shadow: -1px 0 #00fff9;
+        clip: rect(85px, 550px, 140px, 0);
+        animation: glitch-anim 2.5s infinite linear alternate-reverse;
+      }
+      @keyframes glitch-anim {
+        0% { clip: rect(15px, 9999px, 81px, 0); }
+        20% { clip: rect(88px, 9999px, 88px, 0); }
+        40% { clip: rect(12px, 9999px, 6px, 0); }
+        60% { clip: rect(54px, 9999px, 49px, 0); }
+        80% { clip: rect(2px, 9999px, 5px, 0); }
+        100% { clip: rect(74px, 9999px, 7px, 0); }
+      }
+      @keyframes glitch-anim-2 {
+        0% { clip: rect(65px, 9999px, 100px, 0); }
+        100% { clip: rect(4px, 9999px, 83px, 0); }
+      }
+
+      /* Scanning Line Overlay */
+      .scanline {
+        width: 100%;
+        height: 100px;
+        z-index: 10;
+        background: linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0, 243, 255, 0.1) 50%, rgba(0,0,0,0) 100%);
+        opacity: 0.1;
+        position: absolute;
+        bottom: 100%;
+        animation: scanline 10s linear infinite;
+        pointer-events: none;
+      }
+
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.31.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
