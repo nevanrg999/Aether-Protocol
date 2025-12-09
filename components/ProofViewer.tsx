@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { AgentActionProof } from '../types';
 import { resolveDispute } from '../services/geminiService';
-import { Search, Database, CheckCircle, XCircle, AlertOctagon, Activity, ChevronRight, Copy, Box, Hash, Clock, Gavel, Users, ShieldAlert, MessageSquare, Link, FileText } from 'lucide-react';
+import { Search, Database, CheckCircle, XCircle, AlertOctagon, Activity, ChevronRight, Copy, Box, Hash, Clock, Gavel, Users, ShieldAlert, MessageSquare, Link, FileText, Scale, KeyRound, Lock, ShieldCheck } from 'lucide-react';
 
 interface ProofViewerProps {
   proofs: AgentActionProof[];
@@ -105,7 +105,10 @@ const ProofViewer: React.FC<ProofViewerProps> = ({ proofs, onDispute, initialPro
                      <div className="font-mono text-sm text-neon-blue">{p.proofId}</div>
                   </div>
                   <div className="flex items-center gap-8 text-xs text-slate-400 font-mono">
-                     <div className="flex items-center gap-2"><Box size={12}/> BLOCK: #{p.blockHeight}</div>
+                     <div className="flex items-center gap-2">
+                        {p.quantumMetadata && <KeyRound size={12} className="text-neon-purple"/>}
+                        BLOCK: #{p.blockHeight}
+                     </div>
                      <div className="flex items-center gap-2"><Clock size={12}/> {new Date(p.timestamp).toLocaleTimeString()}</div>
                      <ChevronRight size={14} className="text-slate-600 group-hover:text-white" />
                   </div>
@@ -172,6 +175,18 @@ const ProofViewer: React.FC<ProofViewerProps> = ({ proofs, onDispute, initialPro
                        </div>
                    </div>
 
+                   {/* EXPLANATION BLOCK - NEW */}
+                   {foundProof.explanation && (
+                       <div className="space-y-2">
+                           <h4 className="text-[10px] text-neon-blue uppercase font-bold tracking-[0.2em] flex items-center gap-2">
+                               <MessageSquare size={12}/> Decision Explanation
+                           </h4>
+                           <div className="bg-neon-blue/5 border-l-2 border-neon-blue p-4 text-sm text-slate-300 font-sans italic leading-relaxed">
+                               "{foundProof.explanation}"
+                           </div>
+                       </div>
+                   )}
+
                    {foundProof.reasoning.length > 0 && (
                         <div className="space-y-2">
                             <h4 className="text-[10px] text-neon-blue uppercase font-bold tracking-[0.2em] flex items-center gap-2">
@@ -192,6 +207,56 @@ const ProofViewer: React.FC<ProofViewerProps> = ({ proofs, onDispute, initialPro
                {/* Right Column: Consensus & Meta */}
                <div className="space-y-8 border-l border-white/5 pl-0 lg:pl-12">
                    
+                   {/* QUANTUM SECURITY BADGE */}
+                   {foundProof.quantumMetadata ? (
+                       <div className="p-4 border border-neon-purple/30 bg-neon-purple/5 relative overflow-hidden group">
+                           <div className="absolute top-0 right-0 p-3 opacity-20 text-neon-purple"><KeyRound size={48} /></div>
+                           <h4 className="text-[10px] text-neon-purple uppercase font-bold tracking-[0.2em] mb-2 flex items-center gap-2 relative z-10">
+                               <ShieldCheck size={12}/> Post-Quantum Secured
+                           </h4>
+                           <div className="space-y-1 relative z-10">
+                               <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                                   <span>ALGORITHM</span>
+                                   <span className="text-white">{foundProof.quantumMetadata.algorithm}</span>
+                               </div>
+                               <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                                   <span>LATTICE DIM</span>
+                                   <span className="text-white">{foundProof.quantumMetadata.latticeDimension}</span>
+                               </div>
+                               <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                                   <span>PROTOCOL</span>
+                                   <span className="text-white">{foundProof.securityProtocolVersion || 'PQC-v1.0'}</span>
+                               </div>
+                           </div>
+                       </div>
+                   ) : (
+                       <div className="p-4 border border-slate-700 bg-slate-900/50 flex items-center justify-center text-slate-500 text-xs font-mono">
+                           <Lock size={14} className="mr-2"/> Legacy Encryption (Pre-Quantum)
+                       </div>
+                   )}
+
+                   {/* ETHICS REPORT */}
+                   <div className="space-y-4">
+                        <h4 className="text-[10px] text-neon-blue uppercase font-bold tracking-[0.2em] flex items-center gap-2">
+                           <Scale size={12}/> Ethics Compliance
+                        </h4>
+                        {foundProof.ethicalEvaluation ? (
+                            <div className={`p-4 border border-slate-700 bg-black/40 ${foundProof.ethicalEvaluation.status === 'VIOLATION' ? 'border-red-500/50 bg-red-950/20' : foundProof.ethicalEvaluation.status === 'WARNING' ? 'border-yellow-500/50 bg-yellow-950/20' : 'border-neon-green/30 bg-green-950/10'}`}>
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className={`text-xs font-bold font-mono ${foundProof.ethicalEvaluation.status === 'VIOLATION' ? 'text-red-500' : foundProof.ethicalEvaluation.status === 'WARNING' ? 'text-yellow-500' : 'text-neon-green'}`}>
+                                        {foundProof.ethicalEvaluation.status}
+                                    </span>
+                                    <span className="text-[10px] text-slate-500 font-mono">{foundProof.ethicalEvaluation.score}/100</span>
+                                </div>
+                                <div className="text-[10px] text-slate-300 mb-3 leading-relaxed">
+                                    {foundProof.ethicalEvaluation.analysis}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-xs text-slate-600 italic">No ethical audit data found for this block.</div>
+                        )}
+                   </div>
+
                    <div className="space-y-4">
                         <h4 className="text-[10px] text-neon-blue uppercase font-bold tracking-[0.2em] flex items-center gap-2">
                            <Users size={12}/> Consensus Layer
@@ -207,61 +272,6 @@ const ProofViewer: React.FC<ProofViewerProps> = ({ proofs, onDispute, initialPro
                             </div>
                         ))}
                    </div>
-
-                   {/* Judge Verdict Box */}
-                   {foundProof.disputeStatus?.startsWith('Resolved') && (
-                       <div className="p-6 border border-slate-700 bg-gradient-to-br from-slate-900 to-black relative overflow-hidden group">
-                           <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity ${foundProof.disputeStatus === 'Resolved_Upheld' ? 'text-neon-green' : 'text-red-500'}`}>
-                               <Gavel size={80} />
-                           </div>
-                           <h4 className="text-white font-bold font-display uppercase text-lg mb-2 relative z-10">Final Verdict</h4>
-                           <p className="text-slate-300 italic text-sm mb-4 relative z-10">"{foundProof.judgeVerdict}"</p>
-                           <div className="flex justify-between items-center text-[10px] font-mono uppercase text-slate-500 relative z-10">
-                               <span>Adjudicated by Justitia AI</span>
-                               <span className={foundProof.disputeStatus === 'Resolved_Upheld' ? 'text-neon-green' : 'text-red-500'}>
-                                   {foundProof.disputeStatus === 'Resolved_Upheld' ? '+5 REPUTATION' : '-15 REPUTATION'}
-                                </span>
-                           </div>
-                       </div>
-                   )}
-
-                   {/* Actions */}
-                   {!foundProof.isDisputed && !showDisputeForm && (
-                        <button 
-                            onClick={() => setShowDisputeForm(true)}
-                            className="w-full py-4 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white transition-all font-mono font-bold uppercase text-xs tracking-[0.2em] flex items-center justify-center gap-2 group"
-                        >
-                            <ShieldAlert size={14} className="group-hover:animate-pulse" /> Challenge Verification
-                        </button>
-                   )}
-
-                   {showDisputeForm && (
-                       <div className="p-4 bg-red-950/20 border border-red-500/30 animate-in fade-in slide-in-from-bottom-2">
-                           <h4 className="text-red-400 font-bold uppercase text-xs tracking-widest mb-3">Submit Challenge</h4>
-                           <textarea 
-                                value={disputeReason}
-                                onChange={(e) => setDisputeReason(e.target.value)}
-                                placeholder="Describe the error in verification..."
-                                className="w-full bg-black border border-red-900/50 p-3 text-sm text-white focus:border-red-500 focus:outline-none mb-3 min-h-[100px]"
-                           />
-                           <div className="flex gap-3">
-                               <button 
-                                   onClick={() => setShowDisputeForm(false)}
-                                   className="flex-1 py-2 text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-white"
-                               >
-                                   Cancel
-                               </button>
-                               <button 
-                                   onClick={submitChallenge}
-                                   disabled={isChallenging}
-                                   className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold uppercase tracking-widest"
-                               >
-                                   {isChallenging ? 'ADJUDICATING...' : 'SUBMIT'}
-                               </button>
-                           </div>
-                       </div>
-                   )}
-
                </div>
            </div>
         </div>

@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { MOCK_AGENTS, MOCK_PROOFS_INITIAL } from './constants';
-import { AgentActionProof } from './types';
+import { Agent, AgentActionProof, Transaction, AgentService, SecurityProtocol } from './types';
+import { authorizeTransaction, monitorSecurityProtocols } from './services/geminiService';
 import AgentRunner from './components/AgentRunner';
 import ProofViewer from './components/ProofViewer';
 import Marketplace from './components/Marketplace';
 import WorkflowBuilder from './components/WorkflowBuilder';
-import { LayoutDashboard, FileCheck, ShoppingBag, Terminal, Activity, Wifi, Shield, Clock, Zap, Server, Menu, X, Cpu, Radar, Lock, AlertCircle, Fingerprint, GitMerge, Check, Info, AlertTriangle, Hexagon, Globe, Database, Network, Box, ArrowUpRight, BarChart3, Radio, ShieldAlert, CheckCircle, Trash2 } from 'lucide-react';
+import { LayoutDashboard, FileCheck, ShoppingBag, Terminal, Activity, Wifi, Shield, Clock, Zap, Server, Menu, X, Cpu, Radar, Lock, AlertCircle, Fingerprint, GitMerge, Check, Info, AlertTriangle, Hexagon, Globe, Database, Network, Box, ArrowUpRight, BarChart3, Radio, ShieldAlert, CheckCircle, Trash2, Wallet, ShieldCheck } from 'lucide-react';
 
 enum View {
   DASHBOARD = 'DASHBOARD',
@@ -22,7 +23,6 @@ interface Toast {
   type: 'success' | 'info' | 'error';
 }
 
-// Telemetry Sparkline Component
 const Sparkline = ({ color = "#00f3ff" }) => (
     <div className="h-6 w-16 flex items-end gap-0.5 opacity-60">
        {[...Array(12)].map((_,i) => (
@@ -33,39 +33,63 @@ const Sparkline = ({ color = "#00f3ff" }) => (
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.DASHBOARD);
+  const [agents, setAgents] = useState<Agent[]>(MOCK_AGENTS);
   
-  // PERSISTENCE LAYER: Load from localStorage or fallback to initial mock data
+  // PERSISTENCE LAYER
   const [proofs, setProofs] = useState<AgentActionProof[]>(() => {
     try {
       const saved = localStorage.getItem('aether_proofs');
       return saved ? JSON.parse(saved) : MOCK_PROOFS_INITIAL;
     } catch (e) {
-      console.error("Failed to load chain data", e);
       return MOCK_PROOFS_INITIAL;
     }
   });
 
+  // SECURITY PROTOCOL STATE
+  const [securityProtocol, setSecurityProtocol] = useState<SecurityProtocol>({
+      version: 'PQC-v1.0.4',
+      status: 'SECURE',
+      threatLevel: 'LOW',
+      activeAlgorithms: ['CRYSTALS-Kyber', 'Dilithium-5'],
+      lastRotation: new Date().toISOString(),
+      threatDescription: 'All systems nominal. Quantum coherence stable.'
+  });
+
+  // TOKEN SYSTEM STATE
+  const [userBalance, setUserBalance] = useState<number>(1000); // Initial Airdrop
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
   const [time, setTime] = useState(new Date());
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [selectedAgentId, setSelectedAgentId] = useState<string>(MOCK_AGENTS[0].id);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>(agents[0].id);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [selectedProofId, setSelectedProofId] = useState<string | undefined>(undefined);
-  
-  // Dashboard Metrics
   const [tps, setTps] = useState(12);
 
-  // PERSISTENCE LAYER: Save to localStorage whenever proofs change
   useEffect(() => {
     localStorage.setItem('aether_proofs', JSON.stringify(proofs));
   }, [proofs]);
 
+  // Global Timer & Security Monitor Loop
   useEffect(() => {
-    const timer = setInterval(() => {
+    const timer = setInterval(async () => {
         setTime(new Date());
         setTps(prev => Math.floor(Math.max(8, Math.min(60, prev + (Math.random() * 10 - 5)))));
+        
+        // Randomly trigger security check (approx every 30s)
+        if (Math.random() > 0.95) {
+             const apiKey = process.env.API_KEY;
+             if (apiKey) {
+                 const newProto = await monitorSecurityProtocols(securityProtocol, Math.random() * 100, apiKey);
+                 if (newProto.version !== securityProtocol.version || newProto.threatLevel !== securityProtocol.threatLevel) {
+                     setSecurityProtocol(newProto);
+                     addToast(`Security Protocol Updated: ${newProto.version}`, newProto.threatLevel === 'CRITICAL' ? 'error' : 'info');
+                 }
+             }
+        }
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [securityProtocol]);
 
   const addToast = (message: string, type: 'success' | 'info' | 'error' = 'info') => {
     const id = Date.now();
@@ -75,18 +99,52 @@ const App: React.FC = () => {
     }, 4000);
   };
 
+  const handleUpdateAgent = (updatedAgent: Agent) => {
+      setAgents(prev => prev.map(a => a.id === updatedAgent.id ? updatedAgent : a));
+      addToast(`Node Reconfigured: ${updatedAgent.name}`, 'info');
+  };
+
+  // --- TOKEN LOGIC ---
+  const handlePurchaseService = async (agentId: string, service: AgentService) => {
+      // ... (Existing logic same as before)
+      const agent = agents.find(a => a.id === agentId);
+      if (!agent) return;
+      if (userBalance < service.price) { addToast("Insufficient Funds", 'error'); return; }
+      try {
+          const apiKey = process.env.API_KEY || '';
+          const auth = await authorizeTransaction(agent, service.name, service.price, 95, apiKey);
+          if (auth.authorized) {
+              setUserBalance(prev => prev - service.price);
+              setAgents(prev => prev.map(a => a.id === agentId ? { ...a, tokenBalance: a.tokenBalance + service.price } : a));
+              const tx: Transaction = {
+                  id: auth.txHash, from: 'USER', to: agentId, amount: service.price, type: 'SERVICE_PAYMENT',
+                  serviceName: service.name, timestamp: new Date().toISOString(), status: 'CONFIRMED', hash: auth.txHash
+              };
+              setTransactions(prev => [...prev, tx]);
+              addToast(`Service Purchased: ${service.name}`, 'success');
+          } else { addToast(`Transaction Rejected: ${auth.reason}`, 'error'); }
+      } catch (e) { addToast("Transaction Failed", 'error'); }
+  };
+
   const handleProofCreated = (newProof: AgentActionProof) => {
     setProofs(prev => [newProof, ...prev]);
     addToast(`Proof Mined: ${newProof.proofId.substring(0,8)}...`, 'success');
+    if (newProof.trustScoreDelta && newProof.trustScoreDelta > 0) {
+        const rewardAmount = (newProof.trustScoreDelta * 2) + 10;
+        setAgents(prev => prev.map(a => a.id === newProof.agentId ? { ...a, tokenBalance: a.tokenBalance + rewardAmount } : a));
+        const tx: Transaction = {
+            id: `reward-${Date.now()}`, from: 'NETWORK_MINT', to: newProof.agentId, amount: rewardAmount,
+            type: 'TRUST_REWARD', timestamp: new Date().toISOString(), status: 'CONFIRMED', hash: `0x${Math.random().toString(16).slice(2)}`
+        };
+        setTransactions(prev => [...prev, tx]);
+        addToast(`Trust Reward: +${rewardAmount} AE`, 'success');
+    }
   };
 
   const handleDispute = (proofId: string) => {
-    setProofs(prev => prev.map(p => 
-      p.proofId === proofId ? { ...p, isDisputed: true } : p
-    ));
+    setProofs(prev => prev.map(p => p.proofId === proofId ? { ...p, isDisputed: true } : p));
   };
 
-  // Admin function to reset the demo
   const resetLedger = () => {
       if(window.confirm("WARNING: This will wipe the local blockchain state. Continue?")) {
         setProofs(MOCK_PROOFS_INITIAL);
@@ -106,7 +164,7 @@ const App: React.FC = () => {
       setCurrentView(View.PROOFS);
   };
 
-  // --- REVISED DASHBOARD COMPONENT ---
+  // --- DASHBOARD COMPONENT ---
   const Dashboard = () => {
     const disputes = proofs.filter(p => p.isDisputed && !p.disputeStatus?.startsWith('Resolved'));
     
@@ -118,15 +176,15 @@ const App: React.FC = () => {
           {[
               { label: 'Network TPS', value: tps, unit: 'TX/s', icon: <Activity size={16}/>, color: '#00f3ff' },
               { label: 'Block Time', value: '2.04', unit: 's', icon: <Clock size={16}/>, color: '#0aff00' },
-              { label: 'Active Nodes', value: MOCK_AGENTS.length + 42, unit: '', icon: <Server size={16}/>, color: '#bc13fe' },
-              { label: 'Gas Price', value: '24', unit: 'Gwei', icon: <Zap size={16}/>, color: '#facc15' },
+              { label: 'Security Level', value: securityProtocol.threatLevel, unit: '', icon: <ShieldCheck size={16}/>, color: securityProtocol.threatLevel === 'CRITICAL' ? '#ff0000' : '#bc13fe' },
+              { label: 'Protocol', value: securityProtocol.version.replace('PQC-', ''), unit: '', icon: <Lock size={16}/>, color: '#facc15' },
           ].map((stat, i) => (
               <div key={i} className="hud-panel p-5 flex items-center justify-between group h-24">
                  <div className="flex flex-col justify-between h-full">
                     <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest flex items-center gap-2">
                         {stat.icon} {stat.label}
                     </div>
-                    <div className="text-3xl font-bold text-white font-mono flex items-baseline gap-1">
+                    <div className="text-2xl font-bold text-white font-mono flex items-baseline gap-1 truncate">
                         {stat.value} <span className="text-xs text-slate-500 font-normal">{stat.unit}</span>
                     </div>
                  </div>
@@ -138,24 +196,16 @@ const App: React.FC = () => {
       {/* 2. MAIN SPLIT VIEW */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 h-[calc(100vh-280px)] min-h-[600px]">
         
-        {/* LEFT: LIVE CONSENSUS STREAM (Table) */}
+        {/* LEFT: LIVE CONSENSUS STREAM */}
         <div className="xl:col-span-8 hud-panel p-0 flex flex-col relative overflow-hidden cyber-cut h-full">
             <div className="p-5 border-b border-white/5 bg-black/20 flex justify-between items-center shrink-0">
                 <h3 className="text-sm font-bold text-neon-blue uppercase tracking-widest flex items-center gap-2">
                     <Radio size={16} className="animate-pulse" /> Live Consensus Stream
                 </h3>
-                <div className="flex items-center gap-4">
-                    <div className="hidden md:flex items-center gap-4 text-[10px] font-mono text-slate-500">
-                        <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-neon-green"></div> SYNCHRONIZED</span>
-                        <span>BUFFER: 0ms</span>
-                    </div>
-                    <button onClick={resetLedger} className="text-[10px] text-red-900 hover:text-red-500 flex items-center gap-1 font-mono uppercase transition-colors" title="Reset Demo Data">
-                        <Trash2 size={10} /> Reset
-                    </button>
-                </div>
+                {/* ... (Existing header controls) */}
             </div>
             
-            {/* Table Header - RESPONSIVE */}
+            {/* Table Header */}
             <div className="grid grid-cols-6 md:grid-cols-12 gap-4 px-6 py-3 border-b border-white/5 bg-slate-900/50 text-[10px] font-mono text-slate-500 uppercase tracking-wider shrink-0">
                 <div className="col-span-3 md:col-span-3">Tx Hash / Block</div>
                 <div className="col-span-2 md:col-span-3">Agent Node</div>
@@ -164,7 +214,7 @@ const App: React.FC = () => {
                 <div className="hidden md:block md:col-span-1 text-right">Time</div>
             </div>
 
-            {/* Table Body - RESPONSIVE */}
+            {/* Table Body */}
             <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {proofs.map((p, i) => (
                     <div 
@@ -174,7 +224,10 @@ const App: React.FC = () => {
                     >
                         <div className="col-span-3 md:col-span-3 overflow-hidden">
                             <div className="text-neon-blue font-bold truncate group-hover:underline decoration-neon-blue/50 underline-offset-4">{p.proofId}</div>
-                            <div className="text-slate-600 text-[10px] mt-0.5">BLK #{p.blockHeight}</div>
+                            <div className="text-slate-600 text-[10px] mt-0.5 flex items-center gap-2">
+                                <span>BLK #{p.blockHeight}</span>
+                                {p.quantumMetadata && <span className="text-neon-purple font-bold">PQC</span>}
+                            </div>
                         </div>
                         <div className="col-span-2 md:col-span-3 flex items-center gap-3 text-white overflow-hidden">
                             <div className="w-6 h-6 rounded bg-slate-800 border border-slate-700 overflow-hidden shrink-0 hidden sm:block">
@@ -207,6 +260,36 @@ const App: React.FC = () => {
         {/* RIGHT: WIDGETS */}
         <div className="xl:col-span-4 flex flex-col gap-6 h-full">
             
+            {/* NEW: QUANTUM THREAT MONITOR WIDGET */}
+            <div className={`hud-panel p-6 border-t-2 ${securityProtocol.threatLevel === 'CRITICAL' ? 'border-t-red-500 shadow-[0_0_20px_rgba(255,0,0,0.2)]' : 'border-t-neon-purple'}`}>
+                <div className="flex justify-between items-start mb-4">
+                    <h3 className="text-sm font-bold text-white uppercase tracking-widest flex items-center gap-2">
+                        <Radar size={16} className={securityProtocol.threatLevel === 'CRITICAL' ? 'text-red-500 animate-spin' : 'text-neon-purple'} /> 
+                        Sentinel Monitor
+                    </h3>
+                    <span className={`px-2 py-0.5 text-[9px] font-bold border rounded ${securityProtocol.status === 'SECURE' ? 'border-neon-green text-neon-green' : 'border-red-500 text-red-500 animate-pulse'}`}>
+                        {securityProtocol.status}
+                    </span>
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mb-4 leading-relaxed bg-black/20 p-2 border border-white/5">
+                    {securityProtocol.threatDescription}
+                </div>
+                <div className="space-y-2">
+                    <div className="flex justify-between text-[10px] font-mono text-slate-500">
+                        <span>LATTICE ENCRYPTION</span>
+                        <span className="text-neon-purple">ACTIVE</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] font-mono text-slate-500">
+                        <span>LAST KEY ROTATION</span>
+                        <span>{new Date(securityProtocol.lastRotation).toLocaleTimeString()}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] font-mono text-slate-500">
+                        <span>ACTIVE ALGOS</span>
+                        <span className="text-white">{securityProtocol.activeAlgorithms[0]}</span>
+                    </div>
+                </div>
+            </div>
+
             {/* DISPUTE CENTER */}
             <div className="hud-panel p-6 flex flex-col gap-4 border-l-2 border-l-transparent hover:border-l-neon-red transition-all shrink-0">
                 <div className="flex justify-between items-start">
@@ -247,7 +330,7 @@ const App: React.FC = () => {
                     <BarChart3 size={16} className="text-neon-purple" /> Elite Nodes
                 </h3>
                 <div className="space-y-3 overflow-y-auto custom-scrollbar pr-2">
-                    {MOCK_AGENTS.map((agent, idx) => (
+                    {agents.map((agent, idx) => (
                         <div key={agent.id} className="flex items-center gap-3 p-3 bg-white/5 border border-transparent hover:border-neon-purple/30 rounded transition-colors cursor-pointer group" onClick={() => navigateToRunner(agent.id)}>
                             <div className="font-mono text-slate-600 text-xs w-6">0{idx+1}</div>
                             <img src={agent.image} className="w-8 h-8 rounded border border-slate-700" alt=""/>
@@ -255,9 +338,9 @@ const App: React.FC = () => {
                                 <div className="text-xs font-bold text-white truncate group-hover:text-neon-purple transition-colors">{agent.name}</div>
                                 <div className="text-[10px] text-neon-green font-mono">{agent.reputationScore}% TRUST</div>
                             </div>
-                            <button className="text-[10px] bg-slate-800 hover:bg-neon-purple hover:text-white text-slate-400 px-3 py-1 rounded transition-colors uppercase font-bold tracking-wider">
-                                Hire
-                            </button>
+                            <div className="text-[10px] text-slate-400 font-mono text-right">
+                                <div>{agent.tokenBalance} AE</div>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -356,7 +439,7 @@ const App: React.FC = () => {
             active={currentView === View.MARKET} 
             onClick={() => setCurrentView(View.MARKET)} 
             icon={<Network size={20}/>} 
-            label="NODE REGISTRY" 
+            label="SERVICE MARKET" 
           />
         </div>
 
@@ -393,18 +476,20 @@ const App: React.FC = () => {
                  <span className="text-xs font-bold text-white font-mono">{time.toLocaleTimeString()}</span>
                  <span className="text-[10px] text-slate-500 font-mono tracking-widest">{time.toDateString()}</span>
               </div>
-              <button className="tech-border bg-neon-blue/10 hover:bg-neon-blue/20 text-neon-blue px-6 py-2 text-xs font-bold tracking-widest uppercase transition-all">
-                 Connect Wallet
-              </button>
+              
+              {/* User Balance Chip in Header */}
+              <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-neon-purple/10 border border-neon-purple/30 rounded text-xs font-bold font-mono text-neon-purple">
+                  <Wallet size={14} /> {userBalance} AE
+              </div>
            </div>
         </header>
 
         {/* Scrollable Viewport */}
         <main className="flex-1 overflow-y-auto scroll-smooth custom-scrollbar relative p-0">
-           {currentView === View.RUNNER && <AgentRunner agents={MOCK_AGENTS} onProofCreated={handleProofCreated} initialAgentId={selectedAgentId} />}
-           {currentView === View.WORKFLOWS && <WorkflowBuilder agents={MOCK_AGENTS} onProofCreated={handleProofCreated} />}
+           {currentView === View.RUNNER && <AgentRunner agents={agents} onUpdateAgent={handleUpdateAgent} onProofCreated={handleProofCreated} initialAgentId={selectedAgentId} proofs={proofs} />}
+           {currentView === View.WORKFLOWS && <WorkflowBuilder agents={agents} onProofCreated={handleProofCreated} />}
            {currentView === View.PROOFS && <ProofViewer proofs={proofs} onDispute={handleDispute} initialProofId={selectedProofId} />}
-           {currentView === View.MARKET && <Marketplace agents={MOCK_AGENTS} onSelectAgent={navigateToRunner} />}
+           {currentView === View.MARKET && <Marketplace agents={agents} onSelectAgent={navigateToRunner} userBalance={userBalance} onPurchase={handlePurchaseService} transactions={transactions} />}
            {currentView === View.DASHBOARD && <Dashboard />}
         </main>
       </div>

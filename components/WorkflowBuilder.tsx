@@ -89,11 +89,14 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ agents, onProofCreate
           agentName: node.agent.name,
           inputSnippet: i === 0 ? inputText : `Chain Input (Step ${i+1})`,
           actionOutput: execution.actionOutput,
+          explanation: execution.explanation,
           reasoning: execution.reasoning,
           crossChecks: execution.crossChecks,
           isDisputed: false,
           trustScoreDelta: execution.trustScoreDelta,
-          blockHeight: Math.floor(Math.random() * 10000000)
+          blockHeight: Math.floor(Math.random() * 10000000),
+          securityProtocolVersion: 'PQC-v1.0.4',
+          quantumMetadata: execution.quantumMetadata
         };
 
         setStepResults(prev => [...prev, proof]);
